@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src #{webview.cspSource}; script-src 'nonce-#{nonce}';">
+    <style>
+        body { padding: 20px; }
+        input, textarea { width: 100%; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Configuration</h1>
+    <label for="apiEndpoint">API Endpoint URL:</label>
+    <input type="text" id="apiEndpoint" name="apiEndpoint">
+    <label for="stringTemplate">String Template:</label>
+    <textarea id="stringTemplate" name="stringTemplate" rows="4"></textarea>
+    <button id="saveButton">Save Configuration</button>
+    <script nonce="#{nonce}">
+        const vscode = acquireVsCodeApi();
+        document.getElementById('saveButton').addEventListener('click', () => {
+            const apiEndpoint = document.getElementById('apiEndpoint').value;
+            const stringTemplate = document.getElementById('stringTemplate').value;
+            vscode.postMessage({ 
+                command: 'saveConfig',
+                apiEndpoint,
+                stringTemplate
+            });
+        });
+    </script>
+</body>
+</html>

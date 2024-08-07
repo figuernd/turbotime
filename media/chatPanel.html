@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src #{webview.cspSource}; script-src 'nonce-#{nonce}';">
+    <style>
+        body { 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh;
+        }
+        #chatDisplay { 
+            flex-grow: 1; 
+            overflow-y: auto; 
+            margin-bottom: 10px; 
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+        #inputBox { 
+            width: 100%; 
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="chatDisplay"></div>
+    <input type="text" id="inputBox" placeholder="Type your message here...">
+    <script nonce="#{nonce}">
+        const vscode = acquireVsCodeApi();
+        const chatDisplay = document.getElementById('chatDisplay');
+        const inputBox = document.getElementById('inputBox');
+
+        inputBox.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const message = e.target.value;
+                vscode.postMessage({ 
+                    command: 'sendMessage',
+                    message
+                });
+                // Add the message to the chat display
+                chatDisplay.innerHTML += `<p><strong>You:</strong> ${message}</p>`;
+                e.target.value = '';
+            }
+        });
+
+        // Handle messages sent from the extension to the webview
+        window.addEventListener('message', event => {
+            const message = event.data;
+            switch (message.command) {
+                case 'addMessage':
+                    chatDisplay.innerHTML += `<p><strong>${message.sender}:</strong> ${message.text}</p>`;
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

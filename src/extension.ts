@@ -1,26 +1,20 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { ConfigPanel } from './ConfigPanel';
+import { ChatPanel } from './ChatPanel';
+import { APIService } from './APIService';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+    const apiService = new APIService(context);
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "turbotime" is now active!');
+    let disposableConfig = vscode.commands.registerCommand('turbotime.openConfig', () => {
+        ConfigPanel.createOrShow(context, apiService);
+    });
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('turbotime.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from turbotime!');
-	});
+    let disposableChat = vscode.commands.registerCommand('turbotime.openChat', () => {
+        ChatPanel.createOrShow(context, apiService);
+    });
 
-	context.subscriptions.push(disposable);
+    context.subscriptions.push(disposableConfig, disposableChat);
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
