@@ -6,15 +6,8 @@
     <title>TurboTime Configuration</title>
     <style>
         body {
-            font-family: var(--vscode-font-family);
-            font-size: var(--vscode-font-size);
-            color: var(--vscode-foreground);
-            background-color: var(--vscode-editor-background);
+            font-family: Arial, sans-serif;
             padding: 20px;
-        }
-        h1 {
-            color: var(--vscode-titleBar-activeForeground);
-            margin-bottom: 20px;
         }
         .form-group {
             margin-bottom: 15px;
@@ -22,30 +15,17 @@
         label {
             display: block;
             margin-bottom: 5px;
-            color: var(--vscode-input-placeholderForeground);
         }
         input[type="text"], textarea {
             width: 100%;
-            padding: 8px;
-            border: 1px solid var(--vscode-input-border);
-            background-color: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            border-radius: 4px;
+            padding: 5px;
         }
-        textarea {
-            height: 100px;
-            resize: vertical;
-        }
-        #saveButton {
-            padding: 8px 15px;
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
             border: none;
-            border-radius: 4px;
             cursor: pointer;
-        }
-        #saveButton:hover {
-            background-color: var(--vscode-button-hoverBackground);
         }
     </style>
 </head>
@@ -53,40 +33,48 @@
     <h1>Configuration</h1>
     <div class="form-group">
         <label for="apiEndpoint">API Endpoint URL:</label>
-        <input type="text" id="apiEndpoint" placeholder="Enter API endpoint URL">
+        <input type="text" id="apiEndpoint" value="#{apiEndpoint}">
     </div>
     <div class="form-group">
-        <label for="stringTemplate">String Template:</label>
-        <textarea id="stringTemplate" placeholder="Enter string template"></textarea>
+        <label for="systemMessage">System Message:</label>
+        <textarea id="systemMessage" rows="4">#{systemMessage}</textarea>
+    </div>
+    <div class="form-group">
+        <label for="userMessageTemplate">User Message Template:</label>
+        <input type="text" id="userMessageTemplate" value="#{userMessageTemplate}">
+    </div>
+    <div class="form-group">
+        <label for="assistantMessageTemplate">Assistant Message Template:</label>
+        <input type="text" id="assistantMessageTemplate" value="#{assistantMessageTemplate}">
+    </div>
+    <div class="form-group">
+        <label for="apiKey">API Key (optional):</label>
+        <input type="text" id="apiKey" value="#{apiKey}">
     </div>
     <button id="saveButton">Save Configuration</button>
 
     <script>
-        const vscode = acquireVsCodeApi();
-        const apiEndpoint = document.getElementById('apiEndpoint');
-        const stringTemplate = document.getElementById('stringTemplate');
-        const saveButton = document.getElementById('saveButton');
+        (function() {
+            const vscode = acquireVsCodeApi();
+            const saveButton = document.getElementById('saveButton');
 
-        saveButton.addEventListener('click', saveConfig);
+            saveButton.addEventListener('click', () => {
+                const apiEndpoint = document.getElementById('apiEndpoint').value;
+                const systemMessage = document.getElementById('systemMessage').value;
+                const userMessageTemplate = document.getElementById('userMessageTemplate').value;
+                const assistantMessageTemplate = document.getElementById('assistantMessageTemplate').value;
+                const apiKey = document.getElementById('apiKey').value;
 
-        function saveConfig() {
-            vscode.postMessage({
-                command: 'saveConfig',
-                apiEndpoint: apiEndpoint.value,
-                stringTemplate: stringTemplate.value
+                vscode.postMessage({
+                    command: 'saveConfig',
+                    apiEndpoint: apiEndpoint,
+                    systemMessage: systemMessage,
+                    userMessageTemplate: userMessageTemplate,
+                    assistantMessageTemplate: assistantMessageTemplate,
+                    apiKey: apiKey
+                });
             });
-        }
-
-        // Load saved configuration
-        window.addEventListener('message', event => {
-            const message = event.data;
-            switch (message.type) {
-                case 'loadConfig':
-                    apiEndpoint.value = message.apiEndpoint;
-                    stringTemplate.value = message.stringTemplate;
-                    break;
-            }
-        });
+        }());
     </script>
 </body>
 </html>

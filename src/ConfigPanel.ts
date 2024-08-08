@@ -30,7 +30,7 @@ export class ConfigPanel {
 
         const panel = vscode.window.createWebviewPanel(
             'configPanel',
-            'Configuration',
+            'TurboTime Configuration',
             column || vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -41,20 +41,26 @@ export class ConfigPanel {
         ConfigPanel.currentPanel = new ConfigPanel(panel, extensionContext.extensionUri, apiService);
     }
 
-    private _update() {
+    private async _update() {
         const webview = this._panel.webview;
-        this._panel.webview.html = this._getHtmlForWebview(webview);
+        this._panel.webview.html = await this._getHtmlForWebview(webview);
         this._setWebviewMessageListener(webview);
     }
 
-    private _getHtmlForWebview(webview: vscode.Webview) {
+    private async _getHtmlForWebview(webview: vscode.Webview) {
         const htmlPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'configPanel.html');
-        let html = fs.readFileSync(htmlPath.fsPath, 'utf-8');
+        let html = await fs.promises.readFile(htmlPath.fsPath, 'utf-8');
 
-        // Make paths to CSS and JavaScript files absolute
         const nonce = this._getNonce();
         html = html.replace(/#{nonce}/g, nonce);
         html = html.replace(/#{webview.cspSource}/g, webview.cspSource);
+
+        const config = await this.apiService.loadConfig();
+        html = html.replace('#{apiEndpoint}', config.apiEndpoint || '');
+        html = html.replace('#{systemMessage}', config.systemMessage || '');
+        html = html.replace('#{userMessageTemplate}', config.userMessageTemplate || '{message}');
+        html = html.replace('#{assistantMessageTemplate}', config.assistantMessageTemplate || '{message}');
+        html = html.replace('#{apiKey}', config.apiKey || '');
         
         return html;
     }
@@ -73,7 +79,13 @@ export class ConfigPanel {
             async (message: any) => {
                 switch (message.command) {
                     case 'saveConfig':
-                        await this.apiService.saveConfig(message.apiEndpoint, message.stringTemplate);
+                        await this.apiService.saveConfig({
+                            apiEndpoint: message.apiEndpoint,
+                            systemMessage: message.systemMessage,
+                            userMessageTemplate: message.userMessageTemplate,
+                            assistantMessageTemplate: message.assistantMessageTemplate,
+                            apiKey: message.apiKey
+                        });
                         vscode.window.showInformationMessage('Configuration saved successfully!');
                         break;
                 }

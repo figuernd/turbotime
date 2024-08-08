@@ -3,11 +3,17 @@ import { APIService } from './APIService';
 import * as fs from 'fs';
 import * as path from 'path';
 
+interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
 export class ChatPanel {
     public static currentPanel: ChatPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
+    private _chatHistory: ChatMessage[] = [];
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, private apiService: APIService) {
         this._panel = panel;
@@ -30,10 +36,11 @@ export class ChatPanel {
 
         const panel = vscode.window.createWebviewPanel(
             'chatPanel',
-            'Chat',
+            'TurboTime Chat',
             column || vscode.ViewColumn.One,
             {
                 enableScripts: true,
+                retainContextWhenHidden: true,
                 localResourceRoots: [vscode.Uri.joinPath(extensionContext.extensionUri, 'media')]
             }
         );
@@ -51,7 +58,6 @@ export class ChatPanel {
         const htmlPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'chatPanel.html');
         let html = fs.readFileSync(htmlPath.fsPath, 'utf-8');
 
-        // Make paths to CSS and JavaScript files absolute
         const nonce = this._getNonce();
         html = html.replace(/#{nonce}/g, nonce);
         html = html.replace(/#{webview.cspSource}/g, webview.cspSource);
@@ -73,13 +79,37 @@ export class ChatPanel {
             async (message: any) => {
                 switch (message.command) {
                     case 'sendMessage':
-                        console.log('Message sent:', message.message);
+                        await this._handleUserMessage(message.text);
                         break;
                 }
             },
             undefined,
             this._disposables
         );
+    }
+
+    private async _handleUserMessage(text: string) {
+        // Add user message to chat history
+        this._chatHistory.push({ role: 'user', content: text });
+        this._updateChatView();
+
+        try {
+            // Call API
+            const response = await this.apiService.makeAPICall(text);
+
+            // Add assistant message to chat history
+            this._chatHistory.push({ role: 'assistant', content: response });
+            this._updateChatView();
+        } catch (error:any) {
+            vscode.window.showErrorMessage(`Error: ${error.message}`);
+        }
+    }
+
+    private _updateChatView() {
+        this._panel.webview.postMessage({
+            command: 'updateChat',
+            chatHistory: this._chatHistory
+        });
     }
 
     public dispose() {

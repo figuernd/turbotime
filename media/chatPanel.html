@@ -6,82 +6,106 @@
     <title>TurboTime Chat</title>
     <style>
         body {
-            font-family: var(--vscode-font-family);
-            font-size: var(--vscode-font-size);
-            color: var(--vscode-foreground);
-            background-color: var(--vscode-editor-background);
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #chat-container {
+            flex-grow: 1;
+            overflow-y: auto;
             padding: 20px;
         }
-        #chatDisplay {
-            border: 1px solid var(--vscode-panel-border);
-            border-radius: 4px;
-            height: 300px;
-            overflow-y: auto;
+        .message {
+            margin-bottom: 15px;
             padding: 10px;
-            margin-bottom: 20px;
-            background-color: var(--vscode-editor-background);
+            border-radius: 5px;
         }
-        #messageInput {
-            width: calc(100% - 110px);
-            padding: 8px;
-            margin-right: 10px;
-            border: 1px solid var(--vscode-input-border);
-            background-color: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
+        .user-message {
+            background-color: #e1f5fe;
+            align-self: flex-end;
+        }
+        .assistant-message {
+            background-color: #f1f8e9;
+            align-self: flex-start;
+        }
+        #input-container {
+            display: flex;
+            padding: 10px;
+            background-color: #f5f5f5;
+        }
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
             border-radius: 4px;
         }
-        #sendButton {
-            padding: 8px 15px;
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+        #send-button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
             border: none;
             border-radius: 4px;
+            margin-left: 10px;
             cursor: pointer;
-        }
-        #sendButton:hover {
-            background-color: var(--vscode-button-hoverBackground);
         }
     </style>
 </head>
 <body>
-    <div id="chatDisplay"></div>
-    <div>
-        <input type="text" id="messageInput" placeholder="Type your message...">
-        <button id="sendButton">Send</button>
+    <div id="chat-container"></div>
+    <div id="input-container">
+        <input type="text" id="message-input" placeholder="Type your message...">
+        <button id="send-button">Send</button>
     </div>
+
     <script>
-        const vscode = acquireVsCodeApi();
-        const chatDisplay = document.getElementById('chatDisplay');
-        const messageInput = document.getElementById('messageInput');
-        const sendButton = document.getElementById('sendButton');
+        (function() {
+            const vscode = acquireVsCodeApi();
+            const chatContainer = document.getElementById('chat-container');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
 
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') sendMessage();
-        });
-
-        function sendMessage() {
-            const message = messageInput.value.trim();
-            if (message) {
-                vscode.postMessage({
-                    command: 'sendMessage',
-                    message: message
-                });
-                messageInput.value = '';
+            function sendMessage() {
+                const text = messageInput.value.trim();
+                if (text) {
+                    vscode.postMessage({
+                        command: 'sendMessage',
+                        text: text
+                    });
+                    messageInput.value = '';
+                }
             }
-        }
 
-        window.addEventListener('message', event => {
-            const message = event.data;
-            switch (message.type) {
-                case 'addMessage':
+            sendButton.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            window.addEventListener('message', event => {
+                const message = event.data;
+                switch (message.command) {
+                    case 'updateChat':
+                        updateChatView(message.chatHistory);
+                        break;
+                }
+            });
+
+            function updateChatView(chatHistory) {
+                chatContainer.innerHTML = '';
+                chatHistory.forEach(msg => {
                     const messageElement = document.createElement('div');
-                    messageElement.textContent = message.content;
-                    chatDisplay.appendChild(messageElement);
-                    chatDisplay.scrollTop = chatDisplay.scrollHeight;
-                    break;
+                    messageElement.classList.add('message');
+                    messageElement.classList.add(msg.role === 'user' ? 'user-message' : 'assistant-message');
+                    messageElement.textContent = msg.content;
+                    chatContainer.appendChild(messageElement);
+                });
+                chatContainer.scrollTop = chatContainer.scrollHeight;
             }
-        });
+        }());
     </script>
 </body>
 </html>
