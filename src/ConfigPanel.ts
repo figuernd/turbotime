@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { APIService } from './APIService';
+import { FileService } from './FileService';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -9,7 +10,7 @@ export class ConfigPanel {
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, private apiService: APIService) {
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, private apiService: APIService, private fileService: FileService) {
         this._panel = panel;
         this._extensionUri = extensionUri;
 
@@ -18,7 +19,7 @@ export class ConfigPanel {
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     }
 
-    public static createOrShow(extensionContext: vscode.ExtensionContext, apiService: APIService) {
+    public static createOrShow(extensionContext: vscode.ExtensionContext, apiService: APIService, fileService: FileService) {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
@@ -38,7 +39,7 @@ export class ConfigPanel {
             }
         );
 
-        ConfigPanel.currentPanel = new ConfigPanel(panel, extensionContext.extensionUri, apiService);
+        ConfigPanel.currentPanel = new ConfigPanel(panel, extensionContext.extensionUri, apiService, fileService);
     }
 
     private async _update() {

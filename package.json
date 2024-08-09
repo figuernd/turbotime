@@ -46,6 +46,7 @@
     "media/**/*"
   ],
   "dependencies": {
-    "axios": "^1.7.3"
+    "axios": "^1.7.3",
+    "ignore": "^5.3.1"
   }
 }

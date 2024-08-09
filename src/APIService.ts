@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import axios, { AxiosRequestConfig } from 'axios';
+import { FileService } from './FileService';
 
 interface Config {
     apiEndpoint: string;
@@ -19,9 +20,11 @@ export interface Message {
 export class APIService {
     private configPath: string;
     private messageHistory: Message[] = [];
+    private fileService: FileService;
 
-    constructor(private context: vscode.ExtensionContext) {
+    constructor(private context: vscode.ExtensionContext, fileService: FileService) {
         this.configPath = path.join(context.extensionPath, 'config.json');
+        this.fileService = fileService;
     }
 
     public async saveConfig(config: Config): Promise<void> {
@@ -40,6 +43,15 @@ export class APIService {
                 assistantMessageTemplate: '{message}'
             };
         }
+    }
+
+    private async replaceProjectFiles(message: string): Promise<string> {
+        if (message.includes('{project-files}')) {
+            const projectFiles = await this.fileService.getProjectFiles();
+            const fileList = projectFiles.join('\n');
+            return message.replace('{project-files}', fileList);
+        }
+        return message;
     }
 
     public async sendUserMessage(userMessage: string): Promise<string> {
@@ -61,17 +73,18 @@ export class APIService {
 
         // Add the system message if it's not already in the history
         if (this.messageHistory.length === 0 && config.systemMessage) {
-            this.messageHistory.push({ role: 'system', content: config.systemMessage });
+            const systemMessage = await this.replaceProjectFiles(config.systemMessage);
+            this.messageHistory.push({ role: 'system', content: systemMessage });
         }
 
         // Add the new user message without template
         this.messageHistory.push({ role: 'user', content: userMessage });
 
         // Apply templates to create the payload
-        const formattedMessages = this.messageHistory.map(msg => ({
+        const formattedMessages = await Promise.all(this.messageHistory.map(async msg => ({
             ...msg,
-            content: this.applyTemplate(msg.content, msg.role, config)
-        }));
+            content: await this.applyTemplate(msg.content, msg.role, config)
+        })));
 
         const payload = {
             messages: formattedMessages,
@@ -109,19 +122,22 @@ export class APIService {
 
     public async getFormattedMessageHistory(): Promise<Message[]> {
         const config = await this.loadConfig();
-        return this.messageHistory.map(msg => ({
+        return Promise.all(this.messageHistory.map(async msg => ({
             ...msg,
-            content: this.applyTemplate(msg.content, msg.role, config)
-        }));
+            content: await this.applyTemplate(msg.content, msg.role, config)
+        })));
     }
 
-    private applyTemplate(content: string, role: string, config: Config): string {
+    private async applyTemplate(content: string, role: string, config: Config): Promise<string> {
+        let templateContent = content;
         if (role === 'user') {
-            return config.userMessageTemplate.replace('{message}', content);
+            templateContent = config.userMessageTemplate.replace('{message}', content);
         } else if (role === 'assistant') {
-            return config.assistantMessageTemplate.replace('{message}', content);
+            templateContent = config.assistantMessageTemplate.replace('{message}', content);
+        } else if (role === 'system') {
+            templateContent = await this.replaceProjectFiles(content);
         }
-        return content; // For system messages or any other roles
+        return templateContent;
     }
 
     public clearMessageHistory() {

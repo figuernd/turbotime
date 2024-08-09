@@ -2,12 +2,14 @@ import * as vscode from 'vscode';
 import { ConfigPanel } from './ConfigPanel';
 import { ChatPanel } from './ChatPanel';
 import { APIService } from './APIService';
+import { FileService } from './FileService';
 
 export function activate(context: vscode.ExtensionContext) {
-    const apiService = new APIService(context);
+    const fileService = new FileService(context);
+    const apiService = new APIService(context, fileService);
 
     let disposableConfig = vscode.commands.registerCommand('turbotime.openConfig', () => {
-        ConfigPanel.createOrShow(context, apiService);
+        ConfigPanel.createOrShow(context, apiService, fileService);
     });
 
     let disposableChat = vscode.commands.registerCommand('turbotime.openChat', () => {
