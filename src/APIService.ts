@@ -11,7 +11,7 @@ interface Config {
     apiKey?: string;
 }
 
-interface Message {
+export interface Message {
     role: 'system' | 'user' | 'assistant';
     content: string;
 }
@@ -42,7 +42,7 @@ export class APIService {
         }
     }
 
-    public async makeAPICall(userMessage: string): Promise<string> {
+    public async sendUserMessage(userMessage: string): Promise<string> {
         const config = await this.loadConfig();
         
         if (!config.apiEndpoint) {
@@ -64,12 +64,17 @@ export class APIService {
             this.messageHistory.push({ role: 'system', content: config.systemMessage });
         }
 
-        // Add the new user message using the template
-        const formattedUserMessage = config.userMessageTemplate.replace('{message}', userMessage);
-        this.messageHistory.push({ role: 'user', content: formattedUserMessage });
+        // Add the new user message without template
+        this.messageHistory.push({ role: 'user', content: userMessage });
+
+        // Apply templates to create the payload
+        const formattedMessages = this.messageHistory.map(msg => ({
+            ...msg,
+            content: this.applyTemplate(msg.content, msg.role, config)
+        }));
 
         const payload = {
-            messages: this.messageHistory,
+            messages: formattedMessages,
             max_tokens: 150,
             temperature: 0.7,
             top_p: 1,
@@ -77,30 +82,46 @@ export class APIService {
             presence_penalty: 0,
         };
 
-        console.log('Making API call to:', config.apiEndpoint);
-        console.log('With payload:', JSON.stringify(payload, null, 2));
-
         try {
             const response = await axios.post(config.apiEndpoint, payload, axiosConfig);
 
-            console.log('API Response:', response.data);
-
             if (response.data && response.data.choices && response.data.choices.length > 0) {
                 const assistantMessage = response.data.choices[0].message.content.trim();
-                const formattedAssistantMessage = config.assistantMessageTemplate.replace('{message}', assistantMessage);
-                this.messageHistory.push({ role: 'assistant', content: formattedAssistantMessage });
-                return formattedAssistantMessage;
+                // Store the raw assistant message
+                this.messageHistory.push({ role: 'assistant', content: assistantMessage });
+                return assistantMessage;
             } else {
                 throw new Error('Unexpected response format from the API');
             }
-        } catch (error:any) {
-            console.error('Error making API call:', error);
+        } catch (error: any) {
+            console.error('Error sending message:', error);
             if (error.response) {
                 console.error('Response status:', error.response.status);
                 console.error('Response data:', error.response.data);
             }
-            throw new Error(`Failed to get response from the API: ${error.message}`);
+            throw new Error(`Failed to get response: ${error.message}`);
         }
+    }
+
+    public getMessageHistory(): Message[] {
+        return this.messageHistory;
+    }
+
+    public async getFormattedMessageHistory(): Promise<Message[]> {
+        const config = await this.loadConfig();
+        return this.messageHistory.map(msg => ({
+            ...msg,
+            content: this.applyTemplate(msg.content, msg.role, config)
+        }));
+    }
+
+    private applyTemplate(content: string, role: string, config: Config): string {
+        if (role === 'user') {
+            return config.userMessageTemplate.replace('{message}', content);
+        } else if (role === 'assistant') {
+            return config.assistantMessageTemplate.replace('{message}', content);
+        }
+        return content; // For system messages or any other roles
     }
 
     public clearMessageHistory() {

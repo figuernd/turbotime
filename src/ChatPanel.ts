@@ -1,19 +1,13 @@
 import * as vscode from 'vscode';
-import { APIService } from './APIService';
+import { APIService, Message } from './APIService';
 import * as fs from 'fs';
 import * as path from 'path';
-
-interface ChatMessage {
-    role: 'user' | 'assistant';
-    content: string;
-}
 
 export class ChatPanel {
     public static currentPanel: ChatPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
-    private _chatHistory: ChatMessage[] = [];
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, private apiService: APIService) {
         this._panel = panel;
@@ -89,26 +83,24 @@ export class ChatPanel {
     }
 
     private async _handleUserMessage(text: string) {
-        // Add user message to chat history
-        this._chatHistory.push({ role: 'user', content: text });
-        this._updateChatView();
-
         try {
-            // Call API
-            const response = await this.apiService.makeAPICall(text);
+            // Send user message and get response
+            await this.apiService.sendUserMessage(text);
 
-            // Add assistant message to chat history
-            this._chatHistory.push({ role: 'assistant', content: response });
-            this._updateChatView();
-        } catch (error:any) {
+            // Update chat view
+            await this._updateChatView();
+        } catch (error: any) {
             vscode.window.showErrorMessage(`Error: ${error.message}`);
         }
     }
 
-    private _updateChatView() {
+    private async _updateChatView() {
+        const history = await this.apiService.getMessageHistory();
+        // Remove system message
+        const chatHistory = history.slice(1);
         this._panel.webview.postMessage({
             command: 'updateChat',
-            chatHistory: this._chatHistory
+            chatHistory: chatHistory
         });
     }
 
