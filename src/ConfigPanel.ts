@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { APIService } from './APIService';
 import { FileService } from './FileService';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export class ConfigPanel {
     public static currentPanel: ConfigPanel | undefined;
@@ -19,7 +19,7 @@ export class ConfigPanel {
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     }
 
-    public static createOrShow(extensionContext: vscode.ExtensionContext, apiService: APIService, fileService: FileService) {
+    public static async createOrShow(extensionContext: vscode.ExtensionContext, apiService: APIService, fileService: FileService) {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
@@ -44,25 +44,36 @@ export class ConfigPanel {
 
     private async _update() {
         const webview = this._panel.webview;
+
         this._panel.webview.html = await this._getHtmlForWebview(webview);
+
         this._setWebviewMessageListener(webview);
     }
 
     private async _getHtmlForWebview(webview: vscode.Webview) {
         const htmlPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'configPanel.html');
-        let html = await fs.promises.readFile(htmlPath.fsPath, 'utf-8');
+        let html = fs.readFileSync(htmlPath.fsPath, 'utf-8');
 
         const nonce = this._getNonce();
-        html = html.replace(/#{nonce}/g, nonce);
-        html = html.replace(/#{webview.cspSource}/g, webview.cspSource);
 
         const config = await this.apiService.loadConfig();
+
+        // Replace placeholders with actual values
+        html = html.replace('#{nonce}', nonce);
         html = html.replace('#{apiEndpoint}', config.apiEndpoint || '');
-        html = html.replace('#{systemMessage}', config.systemMessage || '');
-        html = html.replace('#{userMessageTemplate}', config.userMessageTemplate || '{message}');
-        html = html.replace('#{assistantMessageTemplate}', config.assistantMessageTemplate || '{message}');
         html = html.replace('#{apiKey}', config.apiKey || '');
-        
+        html = html.replace('#{systemMessage}', config.systemMessage || '');
+        html = html.replace('#{userMessageTemplate}', config.userMessageTemplate || '');
+        html = html.replace('#{assistantMessageTemplate}', config.assistantMessageTemplate || '');
+        html = html.replace('#{maxTokens}', config.maxTokens?.toString() || '150');
+        html = html.replace('#{temperature}', config.temperature?.toString() || '0.7');
+        html = html.replace('#{topP}', config.topP?.toString() || '1');
+        html = html.replace('#{frequencyPenalty}', config.frequencyPenalty?.toString() || '0');
+        html = html.replace('#{presencePenalty}', config.presencePenalty?.toString() || '0');
+        html = html.replace('#{stopSequences}', (config.stopSequences || []).join(', '));
+        html = html.replace('#{modelName}', config.modelName || '');
+        html = html.replace('#{responseFormat}', config.responseFormat || 'text');
+
         return html;
     }
 
@@ -80,14 +91,8 @@ export class ConfigPanel {
             async (message: any) => {
                 switch (message.command) {
                     case 'saveConfig':
-                        await this.apiService.saveConfig({
-                            apiEndpoint: message.apiEndpoint,
-                            systemMessage: message.systemMessage,
-                            userMessageTemplate: message.userMessageTemplate,
-                            assistantMessageTemplate: message.assistantMessageTemplate,
-                            apiKey: message.apiKey
-                        });
-                        vscode.window.showInformationMessage('Configuration saved successfully!');
+                        await this.apiService.saveConfig(message);
+                        vscode.window.showInformationMessage('Configuration saved successfully.');
                         break;
                 }
             },
@@ -98,7 +103,9 @@ export class ConfigPanel {
 
     public dispose() {
         ConfigPanel.currentPanel = undefined;
+
         this._panel.dispose();
+
         while (this._disposables.length) {
             const disposable = this._disposables.pop();
             if (disposable) {

@@ -10,6 +10,14 @@ interface Config {
     userMessageTemplate: string;
     assistantMessageTemplate: string;
     apiKey?: string;
+    maxTokens: number;
+    temperature: number;
+    topP: number;
+    frequencyPenalty: number;
+    presencePenalty: number;
+    stopSequences: string[];
+    modelName: string;
+    responseFormat: string;
 }
 
 export interface Message {
@@ -40,7 +48,15 @@ export class APIService {
                 apiEndpoint: '',
                 systemMessage: '',
                 userMessageTemplate: '{message}',
-                assistantMessageTemplate: '{message}'
+                assistantMessageTemplate: '{message}',
+                maxTokens: 150,
+                temperature: 0.7,
+                topP: 1,
+                frequencyPenalty: 0,
+                presencePenalty: 0,
+                stopSequences: [],
+                modelName: 'meta-llama-3.1-8b',
+                responseFormat: 'text'
             };
         }
     }
@@ -88,11 +104,14 @@ export class APIService {
 
         const payload = {
             messages: formattedMessages,
-            max_tokens: 150,
-            temperature: 0.7,
-            top_p: 1,
-            frequency_penalty: 0,
-            presence_penalty: 0,
+            max_tokens: config.maxTokens,
+            temperature: config.temperature,
+            top_p: config.topP,
+            frequency_penalty: config.frequencyPenalty,
+            presence_penalty: config.presencePenalty,
+            stop: config.stopSequences.length > 0 ? config.stopSequences : undefined,
+            model: config.modelName,
+            response_format: { type: config.responseFormat },
         };
 
         try {
