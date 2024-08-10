@@ -60,6 +60,20 @@
         #send-button:hover {
             background-color: var(--vscode-button-hoverBackground);
         }
+        /* Styles for formatted messages */
+        .message pre {
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .message code {
+            font-family: var(--vscode-editor-font-family);
+            font-size: var(--vscode-editor-font-size);
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
     </style>
 </head>
 <body>
@@ -78,7 +92,7 @@
             function addMessage(content, isUser) {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
-                messageDiv.textContent = content;
+                messageDiv.innerHTML = content;
                 chatContainer.appendChild(messageDiv);
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }
@@ -90,7 +104,6 @@
                         command: 'sendMessage',
                         text: message
                     });
-                    addMessage(message, true);
                     messageInput.value = '';
                 }
             });

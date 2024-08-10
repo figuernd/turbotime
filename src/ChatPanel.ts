@@ -2,17 +2,23 @@ import * as vscode from 'vscode';
 import { APIService, Message } from './APIService';
 import * as fs from 'fs';
 import * as path from 'path';
+import { marked } from 'marked';
+const jsdom = require("jsdom");
+const { JSDOM } = jsdom;
+const createDOMPurify = require('dompurify');
 
 export class ChatPanel {
     public static currentPanel: ChatPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
+    private purify: any;
+    
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, private apiService: APIService) {
         this._panel = panel;
         this._extensionUri = extensionUri;
-
+        this.purify = createDOMPurify(new JSDOM('').window);
         this._update();
 
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -98,10 +104,27 @@ export class ChatPanel {
         const history = await this.apiService.getMessageHistory();
         // Remove system message
         const chatHistory = history.slice(1);
+        const formattedHistory = chatHistory.map(message => ({
+            ...message,
+            content: this._formatMessage(message.content)
+        }));
         this._panel.webview.postMessage({
             command: 'updateChat',
-            chatHistory: chatHistory
+            chatHistory: formattedHistory
         });
+    }
+
+    private _formatMessage(content: string): string {
+        // Convert markdown to HTML
+        const rawHtml = marked(content);
+        
+        // Sanitize the HTML
+        const sanitizedHtml = this.purify.sanitize(rawHtml as any, {
+            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'code', 'pre'],
+            ALLOWED_ATTR: []
+        });
+
+        return sanitizedHtml;
     }
 
     public dispose() {
