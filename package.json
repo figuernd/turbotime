@@ -9,6 +9,7 @@
   "categories": [
     "Other"
   ],
+  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -23,33 +24,35 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
+    "vscode:prepublish": "npm run package",
+    "compile": "node ./esbuild.js",
+    "watch": "node ./esbuild.js --watch",
+    "package": "node ./esbuild.js --minify",
+    "lint": "eslint src --ext ts,tsx",
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.7",
     "@types/node": "20.x",
+    "@types/react": "^18.2.67",
+    "@types/react-dom": "^18.2.22",
     "@types/vscode": "^1.92.0",
     "@typescript-eslint/eslint-plugin": "^7.14.1",
     "@typescript-eslint/parser": "^7.11.0",
     "@vscode/test-cli": "^0.0.9",
     "@vscode/test-electron": "^2.4.0",
+    "esbuild": "^0.20.2",
     "eslint": "^8.57.0",
     "typescript": "^5.4.5"
   },
-  "files": [
-    "out/**/*",
-    "media/**/*"
-  ],
   "dependencies": {
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.0",
+    "@mui/material": "^5.15.13",
     "axios": "^1.7.3",
     "dompurify": "^3.1.6",
     "ignore": "^5.3.1",
-    "jsdom": "^24.1.1",
-    "marked": "^14.0.0"
+    "marked": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }

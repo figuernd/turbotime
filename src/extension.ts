@@ -1,22 +1,114 @@
 import * as vscode from 'vscode';
-import { ConfigPanel } from './ConfigPanel';
-import { ChatPanel } from './ChatPanel';
-import { APIService } from './APIService';
-import { FileService } from './FileService';
+import { APIService } from './services/APIService';
+import { FileService } from './services/FileService';
+
+// Keep track of all active webview panels
+const webviewPanels: vscode.WebviewPanel[] = [];
 
 export function activate(context: vscode.ExtensionContext) {
-    const fileService = new FileService(context);
-    const apiService = new APIService(context, fileService);
+  const fileService = new FileService(context);
+  const apiService = new APIService(context, fileService);
 
-    let disposableConfig = vscode.commands.registerCommand('turbotime.openConfig', () => {
-        ConfigPanel.createOrShow(context, apiService, fileService);
+  let disposableConfig = vscode.commands.registerCommand('turbotime.openConfig', () => {
+    openWebview('config', context, apiService, fileService);
+  });
+
+  let disposableChat = vscode.commands.registerCommand('turbotime.openChat', () => {
+    openWebview('chat', context, apiService, fileService);
+  });
+
+  context.subscriptions.push(disposableConfig, disposableChat);
+
+  // Listen for theme changes
+  context.subscriptions.push(vscode.window.onDidChangeActiveColorTheme(() => {
+    // Notify all webviews about the theme change
+    webviewPanels.forEach(panel => {
+      if (panel.visible) {
+        panel.webview.postMessage({ type: 'updateTheme' });
+      }
     });
+  }));
+}
 
-    let disposableChat = vscode.commands.registerCommand('turbotime.openChat', () => {
-        ChatPanel.createOrShow(context, apiService);
-    });
+function openWebview(
+  type: 'config' | 'chat',
+  context: vscode.ExtensionContext,
+  apiService: APIService,
+  fileService: FileService
+) {
+  if (!fileService.hasWorkspace()) {
+    vscode.window.showErrorMessage('TurboTime requires an open workspace to function.');
+    return;
+  }
 
-    context.subscriptions.push(disposableConfig, disposableChat);
+  const panel = vscode.window.createWebviewPanel(
+    `turbotime${type.charAt(0).toUpperCase() + type.slice(1)}`,
+    `TurboTime ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+    vscode.ViewColumn.One,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'out')]
+    }
+  );
+
+  // Add the new panel to our list
+  webviewPanels.push(panel);
+
+  // Remove the panel from our list when it's disposed
+  panel.onDidDispose(() => {
+    const index = webviewPanels.indexOf(panel);
+    if (index > -1) {
+      webviewPanels.splice(index, 1);
+    }
+  });
+
+  panel.webview.html = getWebviewContent(panel.webview, context.extensionUri, type);
+
+  panel.webview.onDidReceiveMessage(
+    async (message) => {
+      if (type === 'config' && message.command === 'saveConfig') {
+        await apiService.saveConfig(message.config);
+        vscode.window.showInformationMessage('Configuration saved successfully.');
+      } else if (type === 'chat' && message.command === 'sendMessage') {
+        try {
+          const response = await apiService.sendUserMessage(message.text);
+          panel.webview.postMessage({ command: 'receiveMessage', message: response });
+        } catch (error: any) {
+          vscode.window.showErrorMessage(`Error: ${error.message}`);
+        }
+      }
+    },
+    undefined,
+    context.subscriptions
+  );
+
+  // Send initial theme update
+  panel.webview.postMessage({ type: 'updateTheme' });
+}
+
+function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri, page: 'config' | 'chat'): string {
+  const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'out', 'webview-ui.js'));
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>TurboTime ${page === 'config' ? 'Configuration' : 'Chat'}</title>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script>
+            const vscode = acquireVsCodeApi();
+            window.vscode = vscode;
+            window.initialPage = "${page}";
+        </script>
+        <script src="${scriptUri}"></script>
+    </body>
+    </html>
+  `;
 }
 
 export function deactivate() {}
