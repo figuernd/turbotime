@@ -67,7 +67,10 @@ function openWebview(
 
   panel.webview.onDidReceiveMessage(
     async (message) => {
-      if (type === 'config' && message.command === 'saveConfig') {
+      if (message.type === 'loadConfig') {
+        const config = await apiService.loadConfig();
+        panel.webview.postMessage({ type: 'initializeData', data: config });
+      } else if (type === 'config' && message.command === 'saveConfig') {
         await apiService.saveConfig(message.config);
         vscode.window.showInformationMessage('Configuration saved successfully.');
       } else if (type === 'chat' && message.command === 'sendMessage') {
@@ -82,9 +85,6 @@ function openWebview(
     undefined,
     context.subscriptions
   );
-
-  // Send initial theme update
-  panel.webview.postMessage({ type: 'updateTheme' });
 }
 
 function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri, page: 'config' | 'chat'): string {

@@ -37,12 +37,21 @@ export const Config: React.FC = () => {
   });
 
   useEffect(() => {
-    if (vscode) {
-      const storedConfig = vscode.getState();
-      if (storedConfig) {
-        setConfig(storedConfig);
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data;
+      if (message.type === 'initializeData') {
+        setConfig(message.data);
       }
-    }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Request initial data
+    vscode?.postMessage({ type: 'loadConfig' });
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
   }, [vscode]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,7 +65,6 @@ export const Config: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (vscode) {
-      vscode.setState(config);
       vscode.postMessage({ command: 'saveConfig', config });
     }
   };
