@@ -18,9 +18,10 @@ export class FileService {
     if (!this.workspaceRoot) return;
 
     const gitignorePath = path.join(this.workspaceRoot, '.gitignore');
+    this.ignoreFilter = ignore().add('.git');
     try {
       const gitignoreContent = await fs.promises.readFile(gitignorePath, 'utf8');
-      this.ignoreFilter = ignore().add(gitignoreContent);
+      this.ignoreFilter.add(gitignoreContent);
     } catch (error) {
       console.log('No .gitignore file found or error reading it. Proceeding without ignore rules.');
       this.ignoreFilter = null;

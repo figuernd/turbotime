@@ -95,9 +95,12 @@ export const Config: React.FC = () => {
           />
         </Grid>
         <Grid item xs={12}>
+          <Typography variant="body2" marginBottom="10px">
+            System template should include &#123;project-files&#125;, which will be replaced by system project file list and select contents.
+          </Typography>
           <TextField
             fullWidth
-            label="System Message"
+            label="System Template"
             name="systemMessage"
             value={config.systemMessage}
             onChange={handleChange}
@@ -106,18 +109,24 @@ export const Config: React.FC = () => {
           />
         </Grid>
         <Grid item xs={12}>
+          <Typography variant="body2" marginBottom="10px">
+            User template should include &#123;message&#125;, which will be replaced by your message.
+          </Typography>
           <TextField
             fullWidth
-            label="User Message Template"
+            label="User Template"
             name="userMessageTemplate"
             value={config.userMessageTemplate}
             onChange={handleChange}
           />
         </Grid>
         <Grid item xs={12}>
+          <Typography variant="body2" marginBottom="10px">
+            Assistant template should include &#123;message&#125;, which will be replaced by response.
+          </Typography>
           <TextField
             fullWidth
-            label="Assistant Message Template"
+            label="Assistant Template"
             name="assistantMessageTemplate"
             value={config.assistantMessageTemplate}
             onChange={handleChange}

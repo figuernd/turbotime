@@ -80,6 +80,11 @@ function openWebview(
         } catch (error: any) {
           vscode.window.showErrorMessage(`Error: ${error.message}`);
         }
+      } else if (message.command === 'getProjectFiles') {
+        const files = await fileService.getProjectFiles();
+        panel.webview.postMessage({ command: 'updateProjectFiles', files });
+      } else if (message.command === 'updateSelectedFiles') {
+        apiService.setSelectedFiles(message.files);
       }
     },
     undefined,

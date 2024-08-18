@@ -27,8 +27,9 @@ export interface Message {
 
 export class APIService {
   private configPath: string;
-  private messageHistory: Message[] = [];
+  private messageHistory: Message[] = [{ content: '', role: 'system' }];
   private fileService: FileService;
+  private selectedFiles: string[] = [];
 
   constructor(private context: vscode.ExtensionContext, fileService: FileService) {
     this.configPath = path.join(context.extensionPath, 'config.json');
@@ -61,14 +62,6 @@ export class APIService {
     }
   }
 
-  private async replaceProjectFiles(message: string): Promise<string> {
-    if (message.includes('{project-files}')) {
-      const projectFiles = await this.fileService.getProjectFiles();
-      const fileList = projectFiles.join('\n');
-      return message.replace('{project-files}', fileList);
-    }
-    return message;
-  }
 
   public async sendUserMessage(userMessage: string): Promise<string> {
     const config = await this.loadConfig();
@@ -87,10 +80,6 @@ export class APIService {
       axiosConfig.headers['Authorization'] = `Bearer ${config.apiKey}`;
     }
 
-    if (this.messageHistory.length === 0 && config.systemMessage) {
-      this.messageHistory.push({ role: 'system', content: config.systemMessage });
-    }
-
     this.messageHistory.push({ role: 'user', content: userMessage });
 
     const formattedMessages = await Promise.all(this.messageHistory.map(async msg => ({
@@ -100,7 +89,7 @@ export class APIService {
 
     const payload = {
       messages: formattedMessages,
-      max_tokens: config.maxTokens,
+      max_tokens: +config.maxTokens,
       temperature: config.temperature,
       top_p: config.topP,
       frequency_penalty: config.frequencyPenalty,
@@ -141,12 +130,30 @@ export class APIService {
     } else if (role === 'assistant') {
       templateContent = config.assistantMessageTemplate.replace('{message}', content);
     } else if (role === 'system') {
-      templateContent = await this.replaceProjectFiles(content);
+      // Rebuild system message completely each time since config template or
+      // file list and contents may have changed
+      templateContent = await this.createSystemMessage(config.systemMessage);
     }
     return templateContent;
   }
 
-  public clearMessageHistory() {
-    this.messageHistory = [];
+  private async createSystemMessage(baseSystemMessage: string): Promise<string> {
+    const projectFiles = await this.fileService.getProjectFiles();
+    let fileList = projectFiles.join('\n');
+
+    if (this.selectedFiles.length > 0) {
+      const selectedFileContents = await Promise.all(
+        this.selectedFiles.map(async (file) => {
+          const content = await this.fileService.readFile(file);
+          return `File: \`${file}\`\n\`\`\`\n${content}\n\`\`\`\n\n`;
+        })
+      );
+      fileList += '\n\nSelected file contents:\n\n' + selectedFileContents.join('---\n\n');
+    }
+    return baseSystemMessage.replace('{project-files}', fileList);
+  }
+
+  public setSelectedFiles(files: string[]): void {
+    this.selectedFiles = files;
   }
 }
