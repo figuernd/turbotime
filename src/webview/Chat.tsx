@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, TextField, Button, Typography, Paper } from '@mui/material';
+import { Box, TextField, Button, Typography, Paper, Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress } from '@mui/material';
 import { useVSCodeApi } from './common/useVSCodeApi';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -17,24 +17,42 @@ export const Chat: React.FC = () => {
   const [showFileList, setShowFileList] = useState(false);
   const [projectFiles, setProjectFiles] = useState<string[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [showFullContext, setShowFullContext] = useState(false);
+  const [fullContext, setFullContext] = useState('');
+  const [tokenCount, setTokenCount] = useState(0);
+  const [contextLimit, setContextLimit] = useState(1000);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message = event.data;
-      if (message.command === 'receiveMessage') {
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          { role: 'assistant', content: message.message },
-        ]);
-      } else if (message.command === 'updateProjectFiles') {
-        setProjectFiles(message.files);
+      switch (message.command) {
+        case 'receiveMessage':
+          setMessages((prevMessages) => [
+            ...prevMessages,
+            { role: 'assistant', content: message.message },
+          ]);
+          break;
+        case 'updateProjectFiles':
+          setProjectFiles(message.files);
+          break;
+        case 'updateTokenCount':
+          setTokenCount(message.tokenCount);
+          break;
+        case 'updateContextLimit':
+          setContextLimit(message.contextLimit);
+          break;
+        case 'fullContext':
+          setFullContext(message.context);
+          setShowFullContext(true);
+          break;
       }
     };
 
     window.addEventListener('message', handleMessage);
 
-    // Request project files
+    // Request project files and context limit
     vscode?.postMessage({ command: 'getProjectFiles' });
+    vscode?.postMessage({ command: 'getContextLimit' });
 
     return () => {
       window.removeEventListener('message', handleMessage);
@@ -78,23 +96,40 @@ export const Chat: React.FC = () => {
     vscode?.postMessage({ command: 'updateSelectedFiles', files });
   };
 
+  const handleShowFullContext = () => {
+    vscode?.postMessage({ command: 'getFullContext' });
+  };
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h6">TurboTime Chat</Typography>
-        <button
-          onClick={() => setShowFileList(!showFileList)}
-          style={{
-            background: 'none',
-            border: '1px solid var(--vscode-button-background)',
-            color: 'var(--vscode-button-foreground)',
-            padding: '4px 8px',
-            cursor: 'pointer',
-            borderRadius: '4px',
-          }}
-        >
-          {showFileList ? 'Hide Files' : 'Show Files'}
-        </button>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Button
+            onClick={handleShowFullContext}
+            variant="outlined"
+            size="small"
+            sx={{ mr: 2 }}
+          >
+            Show Message
+          </Button>
+          <Box sx={{ width: 200, mr: 2 }}>
+            <LinearProgress
+              variant="determinate"
+              value={(tokenCount / contextLimit) * 100}
+            />
+            <Typography variant="caption">
+              {tokenCount}/{contextLimit}
+            </Typography>
+          </Box>
+          <Button
+            onClick={() => setShowFileList(!showFileList)}
+            variant="outlined"
+            size="small"
+          >
+            {showFileList ? 'Hide Files' : 'Show Files'}
+          </Button>
+        </Box>
       </Box>
       {showFileList && (
         <ProjectFileList
@@ -125,6 +160,17 @@ export const Chat: React.FC = () => {
           Send
         </Button>
       </Box>
+      <Dialog open={showFullContext} onClose={() => setShowFullContext(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Full Context</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" component="pre" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {fullContext}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowFullContext(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -55,6 +55,9 @@ function openWebview(
   // Add the new panel to our list
   webviewPanels.push(panel);
 
+  // Set the webview panel on the APIService instance
+  apiService.setWebviewPanel(panel);
+
   // Remove the panel from our list when it's disposed
   panel.onDidDispose(() => {
     const index = webviewPanels.indexOf(panel);
@@ -67,24 +70,38 @@ function openWebview(
 
   panel.webview.onDidReceiveMessage(
     async (message) => {
-      if (message.type === 'loadConfig') {
-        const config = await apiService.loadConfig();
-        panel.webview.postMessage({ type: 'initializeData', data: config });
-      } else if (type === 'config' && message.command === 'saveConfig') {
-        await apiService.saveConfig(message.config);
-        vscode.window.showInformationMessage('Configuration saved successfully.');
-      } else if (type === 'chat' && message.command === 'sendMessage') {
-        try {
-          const response = await apiService.sendUserMessage(message.text);
-          panel.webview.postMessage({ command: 'receiveMessage', message: response });
-        } catch (error: any) {
-          vscode.window.showErrorMessage(`Error: ${error.message}`);
-        }
-      } else if (message.command === 'getProjectFiles') {
-        const files = await fileService.getProjectFiles();
-        panel.webview.postMessage({ command: 'updateProjectFiles', files });
-      } else if (message.command === 'updateSelectedFiles') {
-        apiService.setSelectedFiles(message.files);
+      switch (message.command) {
+        case 'loadConfig':
+          const config = await apiService.loadConfig();
+          panel.webview.postMessage({ type: 'initializeData', data: config });
+          break;
+        case 'saveConfig':
+          await apiService.saveConfig(message.config);
+          vscode.window.showInformationMessage('Configuration saved successfully.');
+          break;
+        case 'sendMessage':
+          try {
+            const response = await apiService.sendUserMessage(message.text);
+            panel.webview.postMessage({ command: 'receiveMessage', message: response });
+          } catch (error: any) {
+            vscode.window.showErrorMessage(`Error: ${error.message}`);
+          }
+          break;
+        case 'getProjectFiles':
+          const files = await fileService.getProjectFiles();
+          panel.webview.postMessage({ command: 'updateProjectFiles', files });
+          break;
+        case 'updateSelectedFiles':
+          apiService.setSelectedFiles(message.files);
+          break;
+        case 'getFullContext':
+          const fullContext = await apiService.getFullContext();
+          panel.webview.postMessage({ command: 'fullContext', context: fullContext });
+          break;
+        case 'getContextLimit':
+          const contextLimit = await apiService.getContextLimit();
+          panel.webview.postMessage({ command: 'updateContextLimit', contextLimit });
+          break;
       }
     },
     undefined,

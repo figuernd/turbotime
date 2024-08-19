@@ -8,7 +8,8 @@ interface ConfigState {
   systemMessage: string;
   userMessageTemplate: string;
   assistantMessageTemplate: string;
-  maxTokens: number;
+  maxResponseTokens: number;
+  contextLimit: number;
   temperature: number;
   topP: number;
   frequencyPenalty: number;
@@ -18,29 +19,35 @@ interface ConfigState {
   responseFormat: string;
 }
 
+const defaultConfig: ConfigState = {
+  apiEndpoint: '',
+  apiKey: '',
+  systemMessage: '',
+  userMessageTemplate: '{message}',
+  assistantMessageTemplate: '{message}',
+  maxResponseTokens: 150,
+  contextLimit: 4000,
+  temperature: 0.7,
+  topP: 1,
+  frequencyPenalty: 0,
+  presencePenalty: 0,
+  stopSequences: '',
+  modelName: '',
+  responseFormat: 'text',
+};
+
 export const Config: React.FC = () => {
   const vscode = useVSCodeApi();
-  const [config, setConfig] = useState<ConfigState>({
-    apiEndpoint: '',
-    apiKey: '',
-    systemMessage: '',
-    userMessageTemplate: '{message}',
-    assistantMessageTemplate: '{message}',
-    maxTokens: 150,
-    temperature: 0.7,
-    topP: 1,
-    frequencyPenalty: 0,
-    presencePenalty: 0,
-    stopSequences: '',
-    modelName: '',
-    responseFormat: 'text',
-  });
+  const [config, setConfig] = useState<ConfigState>(defaultConfig);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message = event.data;
       if (message.type === 'initializeData') {
-        setConfig(message.data);
+        setConfig(prevConfig => ({
+          ...defaultConfig,
+          ...message.data,
+        }));
       }
     };
 
@@ -135,9 +142,19 @@ export const Config: React.FC = () => {
         <Grid item xs={6}>
           <TextField
             fullWidth
-            label="Max Tokens"
-            name="maxTokens"
-            value={config.maxTokens}
+            label="Max Response Tokens"
+            name="maxResponseTokens"
+            value={config.maxResponseTokens}
+            onChange={handleChange}
+            type="number"
+          />
+        </Grid>
+        <Grid item xs={6}>
+          <TextField
+            fullWidth
+            label="Context Limit"
+            name="contextLimit"
+            value={config.contextLimit}
             onChange={handleChange}
             type="number"
           />

@@ -10,7 +10,8 @@ interface Config {
   userMessageTemplate: string;
   assistantMessageTemplate: string;
   apiKey?: string;
-  maxTokens: number;
+  maxResponseTokens: number;
+  contextLimit: number;
   temperature: number;
   topP: number;
   frequencyPenalty: number;
@@ -30,10 +31,15 @@ export class APIService {
   private messageHistory: Message[] = [{ content: '', role: 'system' }];
   private fileService: FileService;
   private selectedFiles: string[] = [];
+  private webviewPanel: vscode.WebviewPanel | undefined;
 
   constructor(private context: vscode.ExtensionContext, fileService: FileService) {
     this.configPath = path.join(context.extensionPath, 'config.json');
     this.fileService = fileService;
+  }
+
+  public setWebviewPanel(panel: vscode.WebviewPanel): void {
+    this.webviewPanel = panel;
   }
 
   public async saveConfig(config: Config): Promise<void> {
@@ -50,7 +56,8 @@ export class APIService {
         systemMessage: '',
         userMessageTemplate: '{message}',
         assistantMessageTemplate: '{message}',
-        maxTokens: 150,
+        maxResponseTokens: 150,
+        contextLimit: 4000,
         temperature: 0.7,
         topP: 1,
         frequencyPenalty: 0,
@@ -61,7 +68,6 @@ export class APIService {
       };
     }
   }
-
 
   public async sendUserMessage(userMessage: string): Promise<string> {
     const config = await this.loadConfig();
@@ -89,7 +95,7 @@ export class APIService {
 
     const payload = {
       messages: formattedMessages,
-      max_tokens: +config.maxTokens,
+      max_tokens: +config.maxResponseTokens,
       temperature: config.temperature,
       top_p: config.topP,
       frequency_penalty: config.frequencyPenalty,
@@ -105,6 +111,10 @@ export class APIService {
       if (response.data && response.data.choices && response.data.choices.length > 0) {
         const assistantMessage = response.data.choices[0].message.content.trim();
         this.messageHistory.push({ role: 'assistant', content: assistantMessage });
+        
+        // Update token count
+        this.updateTokenCount();
+        
         return assistantMessage;
       } else {
         throw new Error('Unexpected response format from the API');
@@ -155,5 +165,39 @@ export class APIService {
 
   public setSelectedFiles(files: string[]): void {
     this.selectedFiles = files;
+    this.updateTokenCount();
+  }
+
+  public async getFullContext(): Promise<string> {
+    const config = await this.loadConfig();
+    const formattedMessages = await Promise.all(this.messageHistory.map(async msg => ({
+      ...msg,
+      content: await this.applyTemplate(msg.content, msg.role, config)
+    })));
+    return JSON.stringify(formattedMessages, null, 2);
+  }
+
+  private updateTokenCount(): void {
+    const tokenCount = this.estimateTokenCount();
+    this.sendMessageToWebview({ command: 'updateTokenCount', tokenCount });
+  }
+
+  private estimateTokenCount(): number {
+    // This is a very rough estimate. For accurate token counting,
+    // you'd need to use the same tokenizer as the API.
+    return this.messageHistory.reduce((count, message) => {
+      return count + message.content.split(/\s+/).length;
+    }, 0);
+  }
+
+  public async getContextLimit(): Promise<number> {
+    const config = await this.loadConfig();
+    return config.contextLimit;
+  }
+
+  private sendMessageToWebview(message: any): void {
+    if (this.webviewPanel) {
+      this.webviewPanel.webview.postMessage(message);
+    }
   }
 }
