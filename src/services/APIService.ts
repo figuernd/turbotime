@@ -30,7 +30,6 @@ export interface Message {
 export class APIService {
   private configPath: string;
   private messageHistory: Message[] = [{ content: '', role: 'system' }];
-  private formattedMessages: Message[] = [];
   private fileService: FileService;
   private selectedFiles: string[] = [];
   private webviewPanel: vscode.WebviewPanel | undefined;
@@ -77,6 +76,14 @@ export class APIService {
     }
   }
 
+  private async formatMessages(messages: Message[], config: Config | undefined = undefined):Promise<Message[]> {
+    const _config = config || await this.loadConfig();
+    return await Promise.all(messages.map(async msg => ({
+      ...msg,
+      content: await this.applyTemplate(msg.content, msg.role, _config)
+    })));
+  }
+
   public async sendUserMessage(userMessage: string): Promise<string> {
     const config = await this.loadConfig();
     
@@ -96,13 +103,10 @@ export class APIService {
 
     this.messageHistory.push({ role: 'user', content: userMessage });
 
-    this.formattedMessages = await Promise.all(this.messageHistory.map(async msg => ({
-      ...msg,
-      content: await this.applyTemplate(msg.content, msg.role, config)
-    })));
+    const formattedMessages = await this.formatMessages(this.messageHistory, config);
 
     const payload = {
-      messages: this.formattedMessages,
+      messages: formattedMessages,
       max_tokens: +config.maxResponseTokens,
       temperature: config.temperature,
       top_p: config.topP,
@@ -173,7 +177,6 @@ export class APIService {
 
   public setSelectedFiles(files: string[]): void {
     this.selectedFiles = files;
-    this.updateTokenCount();
   }
 
   public async getFullContext(): Promise<string> {
@@ -185,18 +188,24 @@ export class APIService {
     return JSON.stringify(formattedMessages, null, 2);
   }
 
-  private async updateTokenCount(): Promise<void> {
-    const tokenCount = await this.estimateTokenCount();
+  public async updateTokenCount(currentInput = ''): Promise<void> {
+    const tokenCount = await this.estimateTokenCount(currentInput);
     this.sendMessageToWebview({ command: 'updateTokenCount', tokenCount });
   }
 
-  private async estimateTokenCount(): Promise<number> {
+  private async estimateTokenCount(currentInput:string): Promise<number> {
     if (!this.tokenEncoder) {
       await this.initializeTokenEncoder();
     }
+    const currentMessage:Message = {
+      content: currentInput,
+      role: 'user'
+    };
     
     let totalTokens = 0;
-    for (const message of this.formattedMessages) {
+
+    const messages = await this.formatMessages([...this.messageHistory, currentMessage]);
+    for (const message of messages) {
       const encodedMessage = this.tokenEncoder.encode(message.content);
       totalTokens += encodedMessage.length;
       // Add 4 tokens for message metadata (role, etc.)

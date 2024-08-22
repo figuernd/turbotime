@@ -91,9 +91,6 @@ function openWebview(
           const files = await fileService.getProjectFiles();
           panel.webview.postMessage({ command: 'updateProjectFiles', files });
           break;
-        case 'updateSelectedFiles':
-          apiService.setSelectedFiles(message.files);
-          break;
         case 'getFullContext':
           const fullContext = await apiService.getFullContext();
           panel.webview.postMessage({ command: 'fullContext', context: fullContext });
@@ -101,6 +98,10 @@ function openWebview(
         case 'getContextLimit':
           const contextLimit = await apiService.getContextLimit();
           panel.webview.postMessage({ command: 'updateContextLimit', contextLimit });
+          break;
+        case 'updateTokenCount':
+          apiService.setSelectedFiles(message.selectedFiles);
+          await apiService.updateTokenCount(message.input);
           break;
       }
     },

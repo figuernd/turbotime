@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Box, TextField, Button, Typography, Paper, Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress } from '@mui/material';
 import { useVSCodeApi } from './common/useVSCodeApi';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { ProjectFileList } from './ProjectFileList';
+import debounce from 'lodash/debounce';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -21,6 +22,22 @@ export const Chat: React.FC = () => {
   const [fullContext, setFullContext] = useState('');
   const [tokenCount, setTokenCount] = useState(0);
   const [contextLimit, setContextLimit] = useState(1000);
+
+  const updateTokenCount = useCallback(
+    (currentInput: string, currentSelectedFiles: string[]) => {
+      vscode?.postMessage({ 
+        command: 'updateTokenCount', 
+        input: currentInput, 
+        selectedFiles: currentSelectedFiles 
+      });
+  }, [vscode]);
+  
+  const debouncedUpdateTokenCount = useCallback(
+    debounce((currentInput: string, currentSelectedFiles: string[]) => {
+      updateTokenCount(currentInput, currentSelectedFiles);
+    }, 500),
+    [updateTokenCount]
+  );
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -59,6 +76,10 @@ export const Chat: React.FC = () => {
     };
   }, [vscode]);
 
+  useEffect(() => {
+    debouncedUpdateTokenCount(input, selectedFiles);
+  }, [input, selectedFiles, debouncedUpdateTokenCount]);
+
   const sendMessage = () => {
     if (input.trim() && vscode) {
       const userMessage: Message = { role: 'user', content: input };
@@ -93,17 +114,20 @@ export const Chat: React.FC = () => {
 
   const handleFileSelection = (files: string[]) => {
     setSelectedFiles(files);
-    vscode?.postMessage({ command: 'updateSelectedFiles', files });
   };
 
   const handleShowFullContext = () => {
     vscode?.postMessage({ command: 'getFullContext' });
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  };
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6">TurboTime Chat</Typography>
+        <Typography variant="h6">TurboTime</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Button
             onClick={handleShowFullContext}
@@ -111,7 +135,7 @@ export const Chat: React.FC = () => {
             size="small"
             sx={{ mr: 2 }}
           >
-            Show Message
+            Show Payload
           </Button>
           <Box sx={{ width: 200, mr: 2 }}>
             <LinearProgress
@@ -127,7 +151,7 @@ export const Chat: React.FC = () => {
             variant="outlined"
             size="small"
           >
-            {showFileList ? 'Hide Files' : 'Show Files'}
+            {showFileList ? 'Hide Files' : 'Select Files'}
           </Button>
         </Box>
       </Box>
@@ -148,7 +172,7 @@ export const Chat: React.FC = () => {
           fullWidth
           variant="outlined"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={handleInputChange}
           onKeyPress={(e) => {
             if (e.key === 'Enter') {
               sendMessage();
