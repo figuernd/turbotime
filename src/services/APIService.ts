@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import axios, { AxiosRequestConfig } from 'axios';
 import { FileService } from './FileService';
+import tiktoken from 'tiktoken';
 
 interface Config {
   apiEndpoint: string;
@@ -29,13 +30,20 @@ export interface Message {
 export class APIService {
   private configPath: string;
   private messageHistory: Message[] = [{ content: '', role: 'system' }];
+  private formattedMessages: Message[] = [];
   private fileService: FileService;
   private selectedFiles: string[] = [];
   private webviewPanel: vscode.WebviewPanel | undefined;
+  private tokenEncoder: any;
 
   constructor(private context: vscode.ExtensionContext, fileService: FileService) {
     this.configPath = path.join(context.extensionPath, 'config.json');
     this.fileService = fileService;
+    this.initializeTokenEncoder();
+  }
+
+  private async initializeTokenEncoder() {
+    this.tokenEncoder = tiktoken.get_encoding('cl100k_base');
   }
 
   public setWebviewPanel(panel: vscode.WebviewPanel): void {
@@ -88,13 +96,13 @@ export class APIService {
 
     this.messageHistory.push({ role: 'user', content: userMessage });
 
-    const formattedMessages = await Promise.all(this.messageHistory.map(async msg => ({
+    this.formattedMessages = await Promise.all(this.messageHistory.map(async msg => ({
       ...msg,
       content: await this.applyTemplate(msg.content, msg.role, config)
     })));
 
     const payload = {
-      messages: formattedMessages,
+      messages: this.formattedMessages,
       max_tokens: +config.maxResponseTokens,
       temperature: config.temperature,
       top_p: config.topP,
@@ -177,17 +185,27 @@ export class APIService {
     return JSON.stringify(formattedMessages, null, 2);
   }
 
-  private updateTokenCount(): void {
-    const tokenCount = this.estimateTokenCount();
+  private async updateTokenCount(): Promise<void> {
+    const tokenCount = await this.estimateTokenCount();
     this.sendMessageToWebview({ command: 'updateTokenCount', tokenCount });
   }
 
-  private estimateTokenCount(): number {
-    // This is a very rough estimate. For accurate token counting,
-    // you'd need to use the same tokenizer as the API.
-    return this.messageHistory.reduce((count, message) => {
-      return count + message.content.split(/\s+/).length;
-    }, 0);
+  private async estimateTokenCount(): Promise<number> {
+    if (!this.tokenEncoder) {
+      await this.initializeTokenEncoder();
+    }
+    
+    let totalTokens = 0;
+    for (const message of this.formattedMessages) {
+      const encodedMessage = this.tokenEncoder.encode(message.content);
+      totalTokens += encodedMessage.length;
+      // Add 4 tokens for message metadata (role, etc.)
+      totalTokens += 4;
+    }
+    // Add 2 tokens for the messages array wrapper
+    totalTokens += 2;
+    
+    return totalTokens;
   }
 
   public async getContextLimit(): Promise<number> {
