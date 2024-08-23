@@ -103,6 +103,14 @@ function openWebview(
           apiService.setSelectedFiles(message.selectedFiles);
           await apiService.updateTokenCount(message.input);
           break;
+        case 'writeToFile':
+          try {
+            await fileService.writeFile(message.filePath, message.code);
+            vscode.window.showInformationMessage(`File ${message.filePath} has been updated.`);
+          } catch (error: any) {
+            vscode.window.showErrorMessage(`Error writing to file: ${error.message}`);
+          }
+          break;
       }
     },
     undefined,

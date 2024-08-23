@@ -167,7 +167,7 @@ export class APIService {
       const selectedFileContents = await Promise.all(
         this.selectedFiles.map(async (file) => {
           const content = await this.fileService.readFile(file);
-          return `File: \`${file}\`\n\`\`\`\n${content}\n\`\`\`\n\n`;
+          return `FILE:\`${file}\`\n\`\`\`\n${content}\n\`\`\`\n\n`;
         })
       );
       fileList += '\n\nSelected file contents:\n\n' + selectedFileContents.join('---\n\n');

@@ -5,11 +5,76 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { ProjectFileList } from './ProjectFileList';
 import debounce from 'lodash/debounce';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
+
+interface CodeBlockProps {
+  code: string;
+  language: string;
+  filePath?: string;
+}
+
+const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, filePath }) => {
+  const vscode = useVSCodeApi();
+
+  const handleWriteToFile = () => {
+    if (filePath) {
+      vscode?.postMessage({ command: 'writeToFile', filePath, code });
+    }
+  };
+
+  // Customize the vscDarkPlus theme to use VSCode's CSS variables
+  const customStyle = {
+    ...vscDarkPlus,
+    'pre[class*="language-"]': {
+      ...vscDarkPlus['pre[class*="language-"]'],
+      background: 'var(--vscode-editor-background)',
+    },
+    'code[class*="language-"]': {
+      ...vscDarkPlus['code[class*="language-"]'],
+      color: 'var(--vscode-editor-foreground)',
+      'background-color': 'var(--vscode-editor-background)'
+    },
+  };
+
+  return (
+    <Box>
+      <SyntaxHighlighter 
+        language={language} 
+        style={customStyle}
+        customStyle={{
+          margin: 0,
+          padding: '16px',
+          borderRadius: '4px',
+        }}
+      >
+        {code}
+      </SyntaxHighlighter>
+      {filePath && (
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={handleWriteToFile}
+          sx={{ 
+            mt: 1,
+            color: 'var(--vscode-button-foreground)',
+            backgroundColor: 'var(--vscode-button-background)',
+            '&:hover': {
+              backgroundColor: 'var(--vscode-button-hoverBackground)',
+            },
+          }}
+        >
+          Save to {filePath}
+        </Button>
+      )}
+    </Box>
+  );
+};
 
 export const Chat: React.FC = () => {
   const vscode = useVSCodeApi();
@@ -90,7 +155,37 @@ export const Chat: React.FC = () => {
   };
 
   const renderMessage = (message: Message) => {
-    const sanitizedHtml = DOMPurify.sanitize(marked(message.content) as string);
+    const tokens = marked.lexer(message.content);
+    let currentFilePath: string | undefined;
+
+    const renderedContent = tokens.map((token, index) => {
+      if (token.type === 'paragraph' && token.text.startsWith('FILE:`') && token.text.endsWith('`')) {
+        const filePath = token.text.slice(6, -1);
+        if (!filePath.startsWith('/')) {
+          currentFilePath = filePath;
+          return null;
+        }
+      }
+
+      if (token.type === 'code') {
+        const codeBlock = (
+          <CodeBlock
+            key={index}
+            code={token.text}
+            language={token.lang || ''}
+            filePath={currentFilePath}
+          />
+        );
+        currentFilePath = undefined;
+        return codeBlock;
+      }
+
+      const html = marked.parser([token]);
+      return (
+        <div key={index} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />
+      );
+    });
+
     return (
       <Box
         component={Paper}
@@ -101,13 +196,11 @@ export const Chat: React.FC = () => {
           backgroundColor:
             message.role === 'user'
               ? 'var(--vscode-editor-background)'
-              : 'var(--vscode-editor-inactiveSelectionBackground)',
+              : 'var(--vscode-editorInlayHint-background)',
+          color: 'var(--vscode-editor-foreground)',
         }}
       >
-        <Typography
-          variant="body1"
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
+        {renderedContent}
       </Box>
     );
   };
@@ -125,17 +218,22 @@ export const Chat: React.FC = () => {
   };
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ 
+      height: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column',
+      backgroundColor: 'var(--vscode-editor-background)',
+      color: 'var(--vscode-editor-foreground)',
+    }}>
       <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6">TurboTime</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Button
-            onClick={handleShowFullContext}
+            sx={{ mr: 2 }}
+            onClick={() => setShowFileList(!showFileList)}
             variant="outlined"
             size="small"
-            sx={{ mr: 2 }}
           >
-            Show Payload
+            {showFileList ? 'Hide Files' : 'Select Files'}
           </Button>
           <Box sx={{ width: 200, mr: 2 }}>
             <LinearProgress
@@ -147,11 +245,11 @@ export const Chat: React.FC = () => {
             </Typography>
           </Box>
           <Button
-            onClick={() => setShowFileList(!showFileList)}
+            onClick={handleShowFullContext}
             variant="outlined"
             size="small"
           >
-            {showFileList ? 'Hide Files' : 'Select Files'}
+            Show Payload
           </Button>
         </Box>
       </Box>
