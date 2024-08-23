@@ -73,7 +73,7 @@ function openWebview(
       switch (message.command) {
         case 'loadConfig':
           const config = await apiService.loadConfig();
-          panel.webview.postMessage({ type: 'initializeData', data: config });
+          panel.webview.postMessage({ command: 'initializeData', data: config });
           break;
         case 'saveConfig':
           await apiService.saveConfig(message.config);

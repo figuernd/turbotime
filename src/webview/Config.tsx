@@ -43,7 +43,7 @@ export const Config: React.FC = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message = event.data;
-      if (message.type === 'initializeData') {
+      if (message.command === 'initializeData') {
         setConfig(prevConfig => ({
           ...defaultConfig,
           ...message.data,
@@ -54,7 +54,7 @@ export const Config: React.FC = () => {
     window.addEventListener('message', handleMessage);
 
     // Request initial data
-    vscode?.postMessage({ type: 'loadConfig' });
+    vscode?.postMessage({ command: 'loadConfig' });
 
     return () => {
       window.removeEventListener('message', handleMessage);
