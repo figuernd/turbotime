@@ -20,20 +20,20 @@ interface ConfigState {
 }
 
 const defaultConfig: ConfigState = {
-  apiEndpoint: '',
-  apiKey: '',
-  systemMessage: '',
-  userMessageTemplate: '{message}',
-  assistantMessageTemplate: '{message}',
-  maxResponseTokens: 150,
-  contextLimit: 4000,
-  temperature: 0.7,
-  topP: 1,
-  frequencyPenalty: 0,
-  presencePenalty: 0,
-  stopSequences: '',
-  modelName: '',
-  responseFormat: 'text',
+  "apiEndpoint": "https://api.openai.com/v1/chat/completions",
+  "apiKey": "",
+  "systemMessage": "You are an eager senior developer who gets straight to the point in getting this codebase to work. Here are the relevant project files:\n{project-files}\nWhen coding up solutions, write files in their entirety, not just snippets. Precede each file's contents with the filename, like so:\nFILE:`relative/path/to/file.ext`\n```language\nfile contents\n```\nStay friendly but concise and to the point.",
+  "userMessageTemplate": "{message}",
+  "assistantMessageTemplate": "{message}",
+  "maxResponseTokens": 8192,
+  "contextLimit": 32768,
+  "temperature": 0.7,
+  "topP": 1,
+  "frequencyPenalty": 0,
+  "presencePenalty": 0,
+  "stopSequences": "",
+  "modelName": "gpt-4o-mini",
+  "responseFormat": "text"
 };
 
 export const Config: React.FC = () => {
