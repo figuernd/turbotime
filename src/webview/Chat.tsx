@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, TextField, Button, Typography, Paper, Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress } from '@mui/material';
+import { Box, TextField, Button, Typography, Paper, Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress, Select, MenuItem, InputLabel, FormControl } from '@mui/material';
 import { useVSCodeApi } from './common/useVSCodeApi';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -38,7 +38,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, filePath }) => {
     'code[class*="language-"]': {
       ...vscDarkPlus['code[class*="language-"]'],
       color: 'var(--vscode-editor-foreground)',
-      'background-color': 'var(--vscode-editor-background)'
+      backgroundColor: 'var(--vscode-editor-background)'
     },
   };
 
@@ -87,6 +87,8 @@ export const Chat: React.FC = () => {
   const [fullContext, setFullContext] = useState('');
   const [tokenCount, setTokenCount] = useState(0);
   const [contextLimit, setContextLimit] = useState(1000);
+  const [conversations, setConversations] = useState<string[]>(['default']);
+  const [currentConversation, setCurrentConversation] = useState<string>('default');
 
   const updateTokenCount = useCallback(
     (currentInput: string, currentSelectedFiles: string[]) => {
@@ -127,6 +129,9 @@ export const Chat: React.FC = () => {
           setFullContext(message.context);
           setShowFullContext(true);
           break;
+        case 'switchConversation':
+          setMessages(message.messages);
+          break;
       }
     };
 
@@ -159,8 +164,10 @@ export const Chat: React.FC = () => {
     let currentFilePath: string | undefined;
 
     const renderedContent = tokens.map((token, index) => {
-      if (token.type === 'paragraph' && token.text.startsWith('FILE:`') && token.text.endsWith('`')) {
-        const filePath = token.text.slice(6, -1);
+      if (token.type === 'paragraph' 
+        && (token.text.startsWith('FILE:`') || token.text.startsWith('FILE: `')) 
+        && token.text.endsWith('`')) {
+        const filePath = token.text.slice(6, -1).trim();
         if (!filePath.startsWith('/')) {
           currentFilePath = filePath;
           return null;
@@ -217,6 +224,19 @@ export const Chat: React.FC = () => {
     setInput(e.target.value);
   };
 
+  const handleConversationChange = (e: React.ChangeEvent<{ value: unknown }>) => {
+    const newConversation = e.target.value as string;
+    setCurrentConversation(newConversation);
+    vscode?.postMessage({ command: 'switchConversation', conversation: newConversation });
+  };
+
+  const handleNewConversation = () => {
+    const newConversation = `conversation-${conversations.length + 1}`;
+    setConversations([...conversations, newConversation]);
+    setCurrentConversation(newConversation);
+    vscode?.postMessage({ command: 'switchConversation', conversation: newConversation });
+  };
+
   return (
     <Box sx={{ 
       height: '100vh', 
@@ -227,6 +247,23 @@ export const Chat: React.FC = () => {
     }}>
       <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <FormControl sx={{ mr: 2, minWidth: 200 }}>
+            <InputLabel>Conversation</InputLabel>
+            <Select
+              value={currentConversation}
+              onChange={handleConversationChange as any}
+              label="Conversation"
+            >
+              {conversations.map((conversation) => (
+                <MenuItem key={conversation} value={conversation}>
+                  {conversation}
+                </MenuItem>
+              ))}
+              <MenuItem value="" onClick={handleNewConversation}>
+                <em>New Conversation</em>
+              </MenuItem>
+            </Select>
+          </FormControl>
           <Button
             sx={{ mr: 2 }}
             onClick={() => setShowFileList(!showFileList)}
@@ -296,3 +333,4 @@ export const Chat: React.FC = () => {
     </Box>
   );
 };
+

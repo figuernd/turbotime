@@ -29,16 +29,19 @@ export interface Message {
 
 export class APIService {
   private configPath: string;
-  private messageHistory: Message[] = [{ content: '', role: 'system' }];
+  private messageHistories: { [key: string]: Message[] } = {};
   private fileService: FileService;
   private selectedFiles: string[] = [];
   private webviewPanel: vscode.WebviewPanel | undefined;
   private tokenEncoder: any;
+  private currentConversation: string = 'default';
 
   constructor(private context: vscode.ExtensionContext, fileService: FileService) {
     this.configPath = path.join(context.extensionPath, 'config.json');
     this.fileService = fileService;
     this.initializeTokenEncoder();
+    // Initialize default conversation
+    this.messageHistories['default'] = [{ content: '', role: 'system' }];
   }
 
   private async initializeTokenEncoder() {
@@ -76,7 +79,7 @@ export class APIService {
     }
   }
 
-  private async formatMessages(messages: Message[], config: Config | undefined = undefined):Promise<Message[]> {
+  private async formatMessages(messages: Message[], config: Config | undefined = undefined): Promise<Message[]> {
     const _config = config || await this.loadConfig();
     return await Promise.all(messages.map(async msg => ({
       ...msg,
@@ -101,9 +104,9 @@ export class APIService {
       axiosConfig.headers['Authorization'] = `Bearer ${config.apiKey}`;
     }
 
-    this.messageHistory.push({ role: 'user', content: userMessage });
+    this.messageHistories[this.currentConversation].push({ role: 'user', content: userMessage });
 
-    const formattedMessages = await this.formatMessages(this.messageHistory, config);
+    const formattedMessages = await this.formatMessages(this.messageHistories[this.currentConversation], config);
 
     const payload = {
       messages: formattedMessages,
@@ -122,7 +125,7 @@ export class APIService {
 
       if (response.data && response.data.choices && response.data.choices.length > 0) {
         const assistantMessage = response.data.choices[0].message.content.trim();
-        this.messageHistory.push({ role: 'assistant', content: assistantMessage });
+        this.messageHistories[this.currentConversation].push({ role: 'assistant', content: assistantMessage });
         
         // Update token count
         this.updateTokenCount();
@@ -141,8 +144,15 @@ export class APIService {
     }
   }
 
-  public getMessageHistory(): Message[] {
-    return this.messageHistory;
+  public getMessageHistory(conversation: string = 'default'): Message[] {
+    return this.messageHistories[conversation] || [];
+  }
+
+  public switchConversation(conversation: string): void {
+    if (!this.messageHistories[conversation]) {
+      this.messageHistories[conversation] = [{ content: '', role: 'system' }];
+    }
+    this.currentConversation = conversation;
   }
 
   private async applyTemplate(content: string, role: string, config: Config): Promise<string> {
@@ -181,7 +191,7 @@ export class APIService {
 
   public async getFullContext(): Promise<string> {
     const config = await this.loadConfig();
-    const formattedMessages = await Promise.all(this.messageHistory.map(async msg => ({
+    const formattedMessages = await Promise.all(this.messageHistories[this.currentConversation].map(async msg => ({
       ...msg,
       content: await this.applyTemplate(msg.content, msg.role, config)
     })));
@@ -193,18 +203,18 @@ export class APIService {
     this.sendMessageToWebview({ command: 'updateTokenCount', tokenCount });
   }
 
-  private async estimateTokenCount(currentInput:string): Promise<number> {
+  private async estimateTokenCount(currentInput: string): Promise<number> {
     if (!this.tokenEncoder) {
       await this.initializeTokenEncoder();
     }
-    const currentMessage:Message = {
+    const currentMessage: Message = {
       content: currentInput,
       role: 'user'
     };
     
     let totalTokens = 0;
 
-    const messages = await this.formatMessages([...this.messageHistory, currentMessage]);
+    const messages = await this.formatMessages([...this.messageHistories[this.currentConversation], currentMessage]);
     for (const message of messages) {
       const encodedMessage = this.tokenEncoder.encode(message.content);
       totalTokens += encodedMessage.length;

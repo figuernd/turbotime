@@ -111,6 +111,11 @@ function openWebview(
             vscode.window.showErrorMessage(`Error writing to file: ${error.message}`);
           }
           break;
+        case 'switchConversation':
+          apiService.switchConversation(message.conversation);
+          const messages = apiService.getMessageHistory(message.conversation);
+          panel.webview.postMessage({ command: 'switchConversation', messages });
+          break;
       }
     },
     undefined,
