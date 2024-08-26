@@ -28,7 +28,14 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, filePath }) => {
     }
   };
 
-  // Customize the vscDarkPlus theme to use VSCode's CSS variables
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      console.log('Code copied to clipboard!');
+    }, (err) => {
+      console.error('Failed to copy: ', err);
+    });
+  };
+
   const customStyle = {
     ...vscDarkPlus,
     'pre[class*="language-"]': {
@@ -55,13 +62,28 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, filePath }) => {
       >
         {code}
       </SyntaxHighlighter>
-      {filePath && (
+      <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+        {filePath && (
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleWriteToFile}
+            sx={{ 
+              color: 'var(--vscode-button-foreground)',
+              backgroundColor: 'var(--vscode-button-background)',
+              '&:hover': {
+                backgroundColor: 'var(--vscode-button-hoverBackground)',
+              },
+            }}
+          >
+            Save to {filePath}
+          </Button>
+        )}
         <Button
           variant="outlined"
           size="small"
-          onClick={handleWriteToFile}
+          onClick={handleCopyToClipboard}
           sx={{ 
-            mt: 1,
             color: 'var(--vscode-button-foreground)',
             backgroundColor: 'var(--vscode-button-background)',
             '&:hover': {
@@ -69,9 +91,9 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, filePath }) => {
             },
           }}
         >
-          Save to {filePath}
+          Copy
         </Button>
-      )}
+      </Box>
     </Box>
   );
 };
@@ -137,7 +159,6 @@ export const Chat: React.FC = () => {
 
     window.addEventListener('message', handleMessage);
 
-    // Request project files and context limit
     vscode?.postMessage({ command: 'getProjectFiles' });
     vscode?.postMessage({ command: 'getContextLimit' });
 
@@ -333,4 +354,3 @@ export const Chat: React.FC = () => {
     </Box>
   );
 };
-
