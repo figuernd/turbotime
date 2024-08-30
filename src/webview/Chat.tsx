@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, TextField, Button, Typography, Paper, Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress, Select, MenuItem, InputLabel, FormControl } from '@mui/material';
+import { Box, TextField, Button, Typography, Paper, Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress, Select, MenuItem, InputLabel, FormControl, CircularProgress } from '@mui/material';
 import { useVSCodeApi } from './common/useVSCodeApi';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -51,8 +51,8 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, filePath }) => {
 
   return (
     <Box>
-      <SyntaxHighlighter 
-        language={language} 
+      <SyntaxHighlighter
+        language={language}
         style={customStyle}
         customStyle={{
           margin: 0,
@@ -68,7 +68,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, filePath }) => {
             variant="outlined"
             size="small"
             onClick={handleWriteToFile}
-            sx={{ 
+            sx={{
               color: 'var(--vscode-button-foreground)',
               backgroundColor: 'var(--vscode-button-background)',
               '&:hover': {
@@ -83,7 +83,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, filePath }) => {
           variant="outlined"
           size="small"
           onClick={handleCopyToClipboard}
-          sx={{ 
+          sx={{
             color: 'var(--vscode-button-foreground)',
             backgroundColor: 'var(--vscode-button-background)',
             '&:hover': {
@@ -111,16 +111,17 @@ export const Chat: React.FC = () => {
   const [contextLimit, setContextLimit] = useState(1000);
   const [conversations, setConversations] = useState<string[]>(['default']);
   const [currentConversation, setCurrentConversation] = useState<string>('default');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const updateTokenCount = useCallback(
     (currentInput: string, currentSelectedFiles: string[]) => {
-      vscode?.postMessage({ 
-        command: 'updateTokenCount', 
-        input: currentInput, 
-        selectedFiles: currentSelectedFiles 
+      vscode?.postMessage({
+        command: 'updateTokenCount',
+        input: currentInput,
+        selectedFiles: currentSelectedFiles
       });
-  }, [vscode]);
-  
+    }, [vscode]);
+
   const debouncedUpdateTokenCount = useCallback(
     debounce((currentInput: string, currentSelectedFiles: string[]) => {
       updateTokenCount(currentInput, currentSelectedFiles);
@@ -137,6 +138,7 @@ export const Chat: React.FC = () => {
             ...prevMessages,
             { role: 'assistant', content: message.message },
           ]);
+          setIsLoading(false);
           break;
         case 'updateProjectFiles':
           setProjectFiles(message.files);
@@ -175,8 +177,16 @@ export const Chat: React.FC = () => {
     if (input.trim() && vscode) {
       const userMessage: Message = { role: 'user', content: input };
       setMessages((prevMessages) => [...prevMessages, userMessage]);
+      setIsLoading(true);
       vscode.postMessage({ command: 'sendMessage', text: input });
       setInput('');
+    }
+  };
+
+  const cancelRequest = () => {
+    if (isLoading && vscode) {
+      // Implement the logic to cancel the request here
+      setIsLoading(false);
     }
   };
 
@@ -185,8 +195,8 @@ export const Chat: React.FC = () => {
     let currentFilePath: string | undefined;
 
     const renderedContent = tokens.map((token, index) => {
-      if (token.type === 'paragraph' 
-        && (token.text.startsWith('FILE:`') || token.text.startsWith('FILE: `')) 
+      if (token.type === 'paragraph'
+        && (token.text.startsWith('FILE:`') || token.text.startsWith('FILE: `'))
         && token.text.endsWith('`')) {
         const filePath = token.text.slice(6, -1).trim();
         if (!filePath.startsWith('/')) {
@@ -259,9 +269,9 @@ export const Chat: React.FC = () => {
   };
 
   return (
-    <Box sx={{ 
-      height: '100vh', 
-      display: 'flex', 
+    <Box sx={{
+      height: '100vh',
+      display: 'flex',
       flexDirection: 'column',
       backgroundColor: 'var(--vscode-editor-background)',
       color: 'var(--vscode-editor-foreground)',
@@ -309,6 +319,7 @@ export const Chat: React.FC = () => {
           >
             Show Payload
           </Button>
+          <CircularProgress size={24} sx={{ ml: 2, visibility: isLoading ? "visible" : "hidden" }} />
         </Box>
       </Box>
       {showFileList && (
@@ -327,6 +338,7 @@ export const Chat: React.FC = () => {
         <TextField
           fullWidth
           variant="outlined"
+          multiline
           value={input}
           onChange={handleInputChange}
           onKeyPress={(e) => {
@@ -336,9 +348,15 @@ export const Chat: React.FC = () => {
           }}
           sx={{ mr: 1 }}
         />
-        <Button variant="contained" onClick={sendMessage}>
-          Send
-        </Button>
+        {isLoading ? (
+          <Button variant="contained" onClick={cancelRequest}>
+            Stop
+          </Button>
+        ) : (
+          <Button variant="contained" onClick={sendMessage}>
+            Send
+          </Button>
+        )}
       </Box>
       <Dialog open={showFullContext} onClose={() => setShowFullContext(false)} maxWidth="md" fullWidth>
         <DialogTitle>Full Context</DialogTitle>
