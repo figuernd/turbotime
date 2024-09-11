@@ -361,9 +361,7 @@ export const Chat: React.FC = () => {
       <Dialog open={showFullContext} onClose={() => setShowFullContext(false)} maxWidth="md" fullWidth>
         <DialogTitle>Full Context</DialogTitle>
         <DialogContent>
-          <Typography variant="body1" component="pre" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-            {fullContext}
-          </Typography>
+          <CodeBlock code={fullContext} language='JavaScript' />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowFullContext(false)}>Close</Button>
